@@ -1,43 +1,50 @@
-import { useEffect, useState } from 'react';
-import './App.css';
-import CompSWR from './components/SWR'; // Importa el componente SWR
-import CompReactQuery from './components/ReactQuery'; // Importa el componente de React Query
-import CompAxios from './components/Axios'; // Importa el componente de Axios
-import CompUseFetchHook from './components/UseFetchHook'; // Importa el componente UseFetch
-import { QueryClient, QueryClientProvider } from 'react-query';
+import { useState, useEffect } from 'react'
+import './App.css'
 
-const queryClient = new QueryClient();
-
-function App() {
-  const [imageURL, setImageURL] = useState(null);
+const useImageURL = () => {
+  const [imageURLs, setImageURLs] = useState([]);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("https://jsonplaceholder.typicode.com/photos", { mode: "cors" })
-      .then((response) => response.json())
-      .then((response) => setImageURL(response[0].url))
-      .catch((error) => console.error(error));
+    // Realizar ambas solicitudes simultáneamente utilizando Promise.all
+    Promise.all([
+      fetch("https://jsonplaceholder.typicode.com/photos/1", { mode: "cors" }),
+      fetch("https://jsonplaceholder.typicode.com/photos/2", { mode: "cors" })
+    ])
+      .then(responses => Promise.all(responses.map(response => {
+        if (!response.ok) {
+          throw new Error("Server error!!");
+        }
+        return response.json();
+      })))
+      .then(data => {
+        const urls = data.map(response => response.url);
+        setImageURLs(urls);
+      })
+      .catch(error => setError(error))
+      .finally(() => setLoading(false));
   }, []);
 
+  return { imageURLs, error, loading };
+};
+
+function App() {
+  const { imageURLs, error, loading } = useImageURL();
+
+  if (loading) return <p>Loading...</p>
+  if (error) return <p> A network error was encountered ! </p>
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <>
-        <div className="image-section">
-          {imageURL && (
-            <>
-              <h1>An image</h1>
-              <img src={imageURL} alt="placeholder text" />
-            </>
-          )}
+    <>
+      <h1>Images</h1>
+      {imageURLs.map((url, index) => (
+        <div key={index}>
+          <img src={url} alt={`Image ${index + 1}`} />
         </div>
-        <div className="data-section">
-          <CompSWR />
-          <CompReactQuery />
-          <CompAxios />
-          <CompUseFetchHook />
-        </div>
-      </>
-    </QueryClientProvider>
-  );
+      ))}
+    </>
+  )
 }
 
-export default App;
+export default App
